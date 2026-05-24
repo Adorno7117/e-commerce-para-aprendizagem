@@ -1,0 +1,10 @@
+node_modules
+.next
+.env
+.env*.local
+dist
+coverage
+storage/private/*
+!storage/private/.gitkeep
+!storage/private/sample
+*.log

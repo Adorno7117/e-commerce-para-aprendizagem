@@ -1,0 +1,2 @@
+Arquivo privado de exemplo: Sistema Dashboard SaaS.
+Substitua por um pacote real do produto digital no ambiente de producao.

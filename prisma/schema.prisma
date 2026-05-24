@@ -1,0 +1,238 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  FAILED
+  REFUNDED
+}
+
+model User {
+  id              String               @id @default(cuid()) @db.VarChar(191)
+  name            String               @db.VarChar(120)
+  email           String               @unique @db.VarChar(191)
+  passwordHash    String?              @db.VarChar(191)
+  role            UserRole             @default(USER)
+  emailVerifiedAt DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  carts           Cart[]
+  orders          Order[]
+  passwordResets  PasswordResetToken[]
+  adminLogs       AdminLog[]
+
+  @@index([role])
+  @@map("users")
+}
+
+model Category {
+  id          String    @id @default(cuid()) @db.VarChar(191)
+  name        String    @db.VarChar(120)
+  slug        String    @unique @db.VarChar(160)
+  description String?   @db.VarChar(255)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id               String        @id @default(cuid()) @db.VarChar(191)
+  name             String        @db.VarChar(180)
+  slug             String        @unique @db.VarChar(220)
+  shortDescription String        @db.VarChar(255)
+  description      String        @db.Text
+  priceCents       Int
+  imageUrl         String        @db.VarChar(500)
+  fileKey          String        @db.VarChar(500)
+  status           ProductStatus @default(ACTIVE)
+  categoryId       String        @db.VarChar(191)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  category         Category      @relation(fields: [categoryId], references: [id])
+  cartItems        CartItem[]
+  orderItems       OrderItem[]
+
+  @@index([categoryId])
+  @@index([status])
+  @@map("products")
+}
+
+model Cart {
+  id           String     @id @default(cuid()) @db.VarChar(191)
+  userId       String?    @db.VarChar(191)
+  visitorToken String?    @unique @db.VarChar(191)
+  expiresAt    DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  user         User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items        CartItem[]
+
+  @@index([userId])
+  @@map("carts")
+}
+
+model CartItem {
+  id        String   @id @default(cuid()) @db.VarChar(191)
+  cartId    String   @db.VarChar(191)
+  productId String   @db.VarChar(191)
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id])
+
+  @@unique([cartId, productId])
+  @@index([productId])
+  @@map("cart_items")
+}
+
+model Coupon {
+  id                 String   @id @default(cuid()) @db.VarChar(191)
+  code               String   @unique @db.VarChar(60)
+  description        String?  @db.VarChar(255)
+  percentOff         Int?
+  amountOffCents     Int?
+  active             Boolean  @default(true)
+  maxRedemptions     Int?
+  redeemedCount      Int      @default(0)
+  expiresAt          DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  orders             Order[]
+
+  @@index([active])
+  @@map("coupons")
+}
+
+model Order {
+  id                   String      @id @default(cuid()) @db.VarChar(191)
+  publicId             String      @unique @db.VarChar(40)
+  userId               String?     @db.VarChar(191)
+  customerName         String      @db.VarChar(120)
+  customerEmail        String      @db.VarChar(191)
+  status               OrderStatus @default(PENDING)
+  subtotalCents        Int
+  discountCents        Int         @default(0)
+  totalCents           Int
+  couponId             String?     @db.VarChar(191)
+  accessTokenHash      String?     @db.VarChar(191)
+  accessTokenExpiresAt DateTime?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+  user                 User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  coupon               Coupon?     @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  items                OrderItem[]
+  payments             Payment[]
+
+  @@index([userId])
+  @@index([customerEmail])
+  @@index([status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id               String            @id @default(cuid()) @db.VarChar(191)
+  orderId          String            @db.VarChar(191)
+  productId        String            @db.VarChar(191)
+  productName      String            @db.VarChar(180)
+  productSlug      String            @db.VarChar(220)
+  productFileKey   String            @db.VarChar(500)
+  unitPriceCents   Int
+  quantity         Int               @default(1)
+  createdAt        DateTime          @default(now())
+  order            Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product          Product           @relation(fields: [productId], references: [id])
+  digitalDownloads DigitalDownload[]
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+model Payment {
+  id            String        @id @default(cuid()) @db.VarChar(191)
+  orderId       String        @db.VarChar(191)
+  provider      String        @db.VarChar(40)
+  providerRef   String?       @unique @db.VarChar(191)
+  status        PaymentStatus @default(PENDING)
+  amountCents   Int
+  paidAt        DateTime?
+  safeLog       Json?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([status])
+  @@map("payments")
+}
+
+model DigitalDownload {
+  id               String     @id @default(cuid()) @db.VarChar(191)
+  orderItemId      String     @db.VarChar(191)
+  tokenHash        String     @unique @db.VarChar(191)
+  expiresAt        DateTime
+  downloads        Int        @default(0)
+  maxDownloads     Int        @default(5)
+  lastDownloadedAt DateTime?
+  createdAt        DateTime   @default(now())
+  orderItem        OrderItem  @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  @@index([orderItemId])
+  @@index([expiresAt])
+  @@map("digital_downloads")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid()) @db.VarChar(191)
+  userId    String    @db.VarChar(191)
+  tokenHash String    @unique @db.VarChar(191)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model AdminLog {
+  id        String   @id @default(cuid()) @db.VarChar(191)
+  userId    String?  @db.VarChar(191)
+  action    String   @db.VarChar(120)
+  metadata  Json?
+  ip        String?  @db.VarChar(80)
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@map("admin_logs")
+}

@@ -1,0 +1,2 @@
+Arquivo privado de exemplo: Pack Templates Notion.
+Este conteudo nao fica em /public e so pode ser baixado por token temporario.

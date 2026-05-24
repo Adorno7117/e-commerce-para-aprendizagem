@@ -1,0 +1,2 @@
+Arquivo privado de exemplo: Curso Next.js Commerce.
+Em producao, armazene aqui um ZIP, PDF, video ou use um storage privado como S3 com URLs assinadas.
